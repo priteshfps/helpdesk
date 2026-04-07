@@ -206,7 +206,44 @@ import {
 } from "vue";
 import SavedReplyIcon from "./icons/SavedReplyIcon.vue";
 
-const editorRef = ref(null);
+const agentSignature = ref<string>("");
+const signatureResource = createResource({
+  url: "helpdesk.api.agent.get_agent_signature",
+  auto: true,
+  onSuccess(data: string) {
+    // console.log("Agent signature data:", data);
+    agentSignature.value = data || "";
+  },
+});
+
+function signatureAsHtml(): string {
+  const sig = agentSignature.value;
+  if (!sig) return "";
+  // If the API returned proper HTML (has <p> or <br> tags), use as-is.
+  // Otherwise it's plain text — split on newlines and wrap each line in <p>.
+  if (/<[a-z]/i.test(sig)) return sig;
+  return sig
+    .split("\n")
+    .map((line) => `<p>${line || "<br>"}</p>`)
+    .join("");
+}
+
+function buildInitialContent(): string {
+  const sig = signatureAsHtml();
+  // Inject signature <p> nodes directly — no wrapping <div> or <p>.
+  // TipTap's schema understands <p> as paragraph nodes; unknown block
+  // wrappers like <div> get stripped and collapse their children.
+  return sig ? `<p></p>${sig}` : "<p></p>";
+}
+
+function hasSignature(html: string | null | undefined): boolean {
+  if (!html || !agentSignature.value) return false;
+  // Compare against first 20 chars of the raw signature to avoid false positives
+  const firstChunk = agentSignature.value.replace(/<[^>]*>/g, "").slice(0, 20);
+  return firstChunk ? html.includes(firstChunk) : false;
+}
+
+const editorRef = ref<{ editor: import('@tiptap/vue-3').Editor } | null>(null);
 const showSavedRepliesSelectorModal = ref(false);
 const quotedContentRef = ref<HTMLElement | null>(null);
 
@@ -403,9 +440,24 @@ function addToReply(
     });
   }
 
-  editorRef.value.editor.chain().clearContent().focus("start").run();
+  // Set newEmail.value BEFORE setContent so frappe-ui's content watcher sees
+  // currentHTML === val and skips its own setContent, preventing a second
+  // setContent call that collapses signature paragraphs.
+  const initial = buildInitialContent();
+  newEmail.value = initial;
   nextTick(() => {
-    newEmail.value = editorRef.value.editor.getHTML();
+    editorRef.value?.editor.commands.setContent(initial);
+    editorRef.value?.editor.commands.focus("start");
+  });
+}
+
+function initWithSignature() {
+  if (hasSignature(newEmail.value)) return;
+  const initial = buildInitialContent();
+  newEmail.value = initial;
+  nextTick(() => {
+    editorRef.value?.editor.commands.setContent(initial);
+    editorRef.value?.editor.commands.focus("start");
   });
 }
 
@@ -506,6 +558,7 @@ const editor = computed(() => {
 
 defineExpose({
   addToReply,
+  initWithSignature,
   editor,
   submitMail,
 });

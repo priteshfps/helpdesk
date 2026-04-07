@@ -523,6 +523,19 @@ def handle_at_me_support(filters):
 
 
 @frappe.whitelist()
+def get_outgoing_email_addresses() -> list[str]:
+    """Return all email_id values from Email Accounts that have outgoing enabled.
+    Used by the frontend to exclude helpdesk's own addresses from reply recipients.
+    """
+    rows = frappe.get_all(
+        "Email Account",
+        filters={"enable_outgoing": 1},
+        pluck="email_id",
+    )
+    return [r.lower().strip() for r in rows if r]
+
+
+@frappe.whitelist()
 def remove_assignments(
     doctype: str,
     name: str | int,

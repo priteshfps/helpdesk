@@ -66,6 +66,12 @@ doc_events = {
         "on_trash": "helpdesk.extends.assignment_rule.on_assignment_rule_trash",
         "validate": "helpdesk.extends.assignment_rule.on_assignment_rule_validate",
     },
+    "Email Queue": {
+        "before_insert": "helpdesk.overrides.communication_threading.add_threading_headers"
+    },
+#     "Notification Log": {
+#         "after_insert": "helpdesk.overrides.notification.after_notification_log_insert"
+#     },
 }
 
 has_permission = {

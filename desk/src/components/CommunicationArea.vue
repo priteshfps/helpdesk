@@ -8,11 +8,21 @@
           ref="sendEmailRef"
           variant="ghost"
           label="Reply"
-          :class="[showEmailBox ? '!bg-gray-300 hover:!bg-gray-200' : '']"
+          :class="[showEmailBox && replyMode === 'reply' ? '!bg-gray-300 hover:!bg-gray-200' : '']"
           @click="toggleEmailBox()"
         >
           <template #prefix>
             <EmailIcon class="h-4" />
+          </template>
+        </Button>
+        <Button
+          variant="ghost"
+          label="Reply All"
+          :class="[showEmailBox && replyMode === 'replyAll' ? '!bg-gray-300 hover:!bg-gray-200' : '']"
+          @click="toggleEmailBoxReplyAll()"
+        >
+          <template #prefix>
+            <ReplyAllIcon class="h-4" />
           </template>
         </Button>
         <Button
@@ -96,30 +106,105 @@
 
 <script setup lang="ts">
 import { CommentTextEditor, EmailEditor, TypingIndicator } from "@/components";
-import { CommentIcon, EmailIcon } from "@/components/icons/";
+import { CommentIcon, EmailIcon, ReplyAllIcon } from "@/components/icons/";
 import { useDevice } from "@/composables";
 import { useScreenSize } from "@/composables/screen";
 import { useShortcut } from "@/composables/shortcuts";
 import { showCommentBox, showEmailBox } from "@/pages/ticket/modalStates";
-import { ref, watch } from "vue";
+import { useAuthStore } from "@/stores/auth";
+import { extractBareEmail, normalizeEmailList } from "@/utils";
+import { storeToRefs } from "pinia";
+import { nextTick, ref, watch } from "vue";
 import { onClickOutside } from "@vueuse/core";
 
 const emit = defineEmits(["update"]);
 const content = defineModel("content");
 const { isMac } = useDevice();
 const { isMobileView } = useScreenSize();
-let doc = defineModel();
 // let doc = inject(TicketSymbol)?.value.doc
-const emailEditorRef = ref(null);
-const commentTextEditorRef = ref(null);
-const emailBoxRef = ref(null);
-const commentBoxRef = ref(null);
+const emailEditorRef = ref<InstanceType<typeof EmailEditor> | null>(null);
+const commentTextEditorRef = ref<InstanceType<typeof CommentTextEditor> | null>(null);
+const emailBoxRef = ref<HTMLElement | null>(null);
+const commentBoxRef = ref<HTMLElement | null>(null);
+const replyMode = ref<"reply" | "replyAll">("reply");
+
+const { user: authUser } = storeToRefs(useAuthStore());
+
+function buildReplyAllData(email: any) {
+  const user = authUser.value;
+  const senderEmail = extractBareEmail(email.sender?.name || "");
+
+  // Normalize all address fields first, then exclude self and sender
+  const filterAddrs = (field: string | string[] | null | undefined): string[] =>
+    normalizeEmailList(field).filter(
+      (e) => e !== user?.toLowerCase() && e !== senderEmail
+    );
+
+  const filteredTo = filterAddrs(email.to);
+  const filteredCc = filterAddrs(email.cc);
+  const filteredBcc = filterAddrs(email.bcc);
+
+  if (user?.toLowerCase() === senderEmail) {
+    // We sent this email — reply goes to the original recipients
+    return {
+      content: email.content,
+      to: filteredTo,
+      cc: filteredCc,
+      bcc: filteredBcc,
+    };
+  } else {
+    // We received this email — reply goes to the sender, others in CC
+    const ccSeen = new Set<string>([...filteredTo, ...filteredCc]);
+    return {
+      content: email.content,
+      to: senderEmail ? [senderEmail] : filteredTo,
+      cc: Array.from(ccSeen),
+      bcc: filteredBcc,
+    };
+  }
+}
 
 function toggleEmailBox() {
+  if (showEmailBox.value && replyMode.value === "reply") {
+    showEmailBox.value = false;
+    return;
+  }
   if (showCommentBox.value) {
     showCommentBox.value = false;
   }
-  showEmailBox.value = !showEmailBox.value;
+  replyMode.value = "reply";
+  if (props.lastEmail) {
+    showEmailBox.value = true;
+    nextTick(() => {
+      emailEditorRef.value?.addToReply(
+        props.lastEmail.content,
+        props.toEmails,
+        props.ccEmails,
+        props.bccEmails
+      );
+    });
+  } else {
+    showEmailBox.value = true;
+    nextTick(() => {
+      emailEditorRef.value?.initWithSignature();
+    });
+  }
+}
+
+function toggleEmailBoxReplyAll() {
+  if (showEmailBox.value && replyMode.value === "replyAll") {
+    showEmailBox.value = false;
+    return;
+  }
+  if (showCommentBox.value) {
+    showCommentBox.value = false;
+  }
+  replyMode.value = "replyAll";
+  if (props.lastEmail) {
+    replyToEmail(buildReplyAllData(props.lastEmail));
+  } else {
+    showEmailBox.value = true;
+  }
 }
 
 function toggleCommentBox() {
@@ -130,32 +215,39 @@ function toggleCommentBox() {
 }
 
 function submitEmail() {
-  if (emailEditorRef.value.submitMail()) {
+  if (emailEditorRef.value?.submitMail()) {
     emit("update");
   }
 }
 
 function submitComment() {
-  if (commentTextEditorRef.value.submitComment()) {
+  if (commentTextEditorRef.value?.submitComment()) {
     emit("update");
   }
 }
 
-function splitIfString(str: string | string[]) {
-  if (typeof str === "string") {
-    return str.split(",");
-  }
-  return str;
-}
 
-function replyToEmail(data: object) {
+
+function replyToEmail(data: { content?: string; to?: string | string[]; cc?: string | string[]; bcc?: string | string[] }) {
   showEmailBox.value = true;
+
+  // Normalize + deduplicate, then merge email-level CC with thread-wide CC
+  const emailCc = normalizeEmailList(data.cc);
+  const threadCc = normalizeEmailList(props.ccEmails as string[]);
+  const ccSeen = new Set<string>(emailCc);
+  const mergedCc = [...emailCc];
+  for (const addr of threadCc) {
+    if (!ccSeen.has(addr)) {
+      ccSeen.add(addr);
+      mergedCc.push(addr);
+    }
+  }
 
   emailEditorRef.value.addToReply(
     data.content,
-    splitIfString(data.to),
-    splitIfString(data.cc),
-    splitIfString(data.bcc)
+    normalizeEmailList(data.to),
+    mergedCc,
+    normalizeEmailList(data.bcc)
   );
 }
 
@@ -179,6 +271,10 @@ const props = defineProps({
   bccEmails: {
     type: Array,
     default: () => [],
+  },
+  lastEmail: {
+    type: Object,
+    default: null,
   },
 });
 
@@ -210,6 +306,7 @@ useShortcut("c", () => {
 defineExpose({
   replyToEmail,
   toggleEmailBox,
+  toggleEmailBoxReplyAll,
   toggleCommentBox,
   editor: emailEditorRef,
 });

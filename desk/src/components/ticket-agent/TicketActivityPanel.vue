@@ -39,6 +39,7 @@
     :to-emails="[ticket.doc?.raised_by]"
     :cc-emails="[]"
     :bcc-emails="[]"
+    :last-email="lastEmail"
     :key="ticket.doc?.name"
     @update="
       () => {
@@ -65,14 +66,26 @@ import {
   TicketSymbol,
   TicketTab,
 } from "@/types";
-import { LoadingIndicator, Tabs } from "frappe-ui";
+import { createResource, LoadingIndicator, Tabs } from "frappe-ui";
 import { storeToRefs } from "pinia";
 import { computed, ComputedRef, defineAsyncComponent, inject, ref } from "vue";
+// import { extractBareEmail, normalizeEmailList } from "@/utils";
 import TicketAgentActivities from "../ticket/TicketAgentActivities.vue";
 
 const CommunicationArea = defineAsyncComponent(
   () => import("@/components/CommunicationArea.vue")
 );
+
+// // Fetch all outgoing email addresses configured in the system so we can
+// // exclude them from reply recipients (prevent emailing our own helpdesk inbox)
+// const outgoingEmailsResource = createResource({
+//   url: "helpdesk.api.doc.get_outgoing_email_addresses",
+//   auto: true,
+// });
+// const outgoingEmails = computed<Set<string>>(() => {
+//   const list: string[] = outgoingEmailsResource.data || [];
+//   return new Set(list.map((e) => e.toLowerCase().trim()));
+// });
 
 const ticket = inject(TicketSymbol);
 const activities = inject(ActivitiesSymbol);
@@ -241,12 +254,51 @@ const _activities = computed(() => {
   return data;
 });
 
+const lastEmail = computed(() => {
+  const emails = _activities.value.filter((a) => a.type === "email");
+  return emails.length ? emails[emails.length - 1] : null;
+});
+
 function filterActivities(eventType: TicketTab) {
   if (eventType === "activity") {
     return _activities.value;
   }
   return _activities.value.filter((activity) => activity.type === eventType);
 }
+
+// const threadCcEmails = computed(() => {
+//   if (!activities.value?.data?.communications) return [];
+
+//   const raisedBy = extractBareEmail(ticket.value?.doc?.raised_by || "");
+
+//   // Exclude: ticket raiser (goes in TO) and all outgoing helpdesk addresses
+//   const excludeEmails = new Set<string>(outgoingEmails.value);
+//   if (raisedBy) excludeEmails.add(raisedBy);
+
+//   const ccSet = new Set<string>();
+
+//   for (const email of activities.value.data.communications as any[]) {
+//     for (const addr of normalizeEmailList(email.cc)) {
+//       if (!excludeEmails.has(addr)) ccSet.add(addr);
+//     }
+//     // Only pull recipients from SENT emails — received recipients are the
+//     // helpdesk inbox address and must never be CC'd back.
+//     if (email.sent_or_received === "Sent") {
+//       for (const addr of normalizeEmailList(email.recipients)) {
+//         if (!excludeEmails.has(addr)) ccSet.add(addr);
+//       }
+//     }
+//   }
+
+//   // Include original CC stored on the ticket doc
+//   for (const addr of normalizeEmailList(
+//     ticket.value?.doc?.custom_original_cc
+//   )) {
+//     if (!excludeEmails.has(addr)) ccSet.add(addr);
+//   }
+
+//   return Array.from(ccSet);
+// });
 </script>
 
 <style scoped></style>

@@ -1,9 +1,10 @@
+import email.utils
 import json
 import uuid
 from datetime import timedelta
 from email.utils import parseaddr
 from functools import lru_cache
-
+from html import unescape
 import frappe
 from bs4 import BeautifulSoup
 from frappe import _
@@ -44,6 +45,10 @@ from helpdesk.utils import (
 
 from ..hd_notification.utils import clear as clear_notifications
 from ..hd_service_level_agreement.utils import get_sla
+
+
+frappe.utils.logger.set_log_level("DEBUG")
+logger = frappe.logger("dev", allow_site=True, file_count=50)
 
 
 class HDTicket(Document):
@@ -222,8 +227,23 @@ class HDTicket(Document):
                         self.notify_agent(agent.name, "Reaction")
 
         self.remove_assignment_if_not_in_team()
+        self.mark_unread_for_others()
         self.publish_update()
         self.capture_update_telemetry_events()
+
+    def mark_unread_for_others(self):
+        """
+        Clear _seen for everyone except the current user so the ticket
+        appears as unread (bold) in the list view for other agents.
+        """
+        if not self.is_new():
+            frappe.db.set_value(
+                "HD Ticket",
+                self.name,
+                "_seen",
+                frappe.as_json([frappe.session.user]),
+                update_modified=False,
+            )
 
     def notify_agent(self, agent, notification_type="Assignment"):
         frappe.get_doc(
@@ -577,11 +597,172 @@ class HDTicket(Document):
         sender = frappe.session.user
         recipients = to or self.raised_by
         sender_email = None if skip_email_workflow else self.sender_email()
-
+        #logger.info(f"Replying to ticket {self.name} with message: {message}, to: {to}, cc: {cc}, bcc: {bcc}, attachments: {attachments}, sender_email:   {sender_email.name if sender_email else None}, recipients: {recipients}, skip_email_workflow: {skip_email_workflow}")
         if recipients == "Administrator":
             admin_email = frappe.get_value("User", "Administrator", "email")
             recipients = admin_email
 
+        # Collect all helpdesk-owned email addresses (both outgoing and incoming)
+        # so we never send to ourselves — that would loop email back into the system.
+        outgoing_emails: set[str] = {
+            r.lower().strip()
+            for r in frappe.get_all(
+                "Email Account",
+                filters=[["enable_outgoing", "=", 1]],
+                pluck="email_id",
+            )
+            if r
+        } | {
+            r.lower().strip()
+            for r in frappe.get_all(
+                "Email Account",
+                filters=[["enable_incoming", "=", 1]],
+                pluck="email_id",
+            )
+            if r
+        }
+        
+        def _clean_addr_list(raw: str | list | None) -> list[str]:
+            """Parse, normalise, deduplicate and remove outgoing addresses.
+
+            Handles any of these formats safely:
+            bare@email.com
+            <bare@email.com>
+            "Display Name" <email@domain.com>
+            'Name'\r\n\t<email@domain.com>
+            &quot;Display Name&quot; &lt;email@domain.com&gt;
+
+            Uses email.utils.getaddresses which correctly handles commas
+            inside quoted display names.
+            """
+            if not raw:
+                return []
+
+            if isinstance(raw, list):
+                raw = ",".join([r for r in raw if r])
+
+            # Decode HTML-escaped input first
+            raw = unescape(raw)
+
+            # Normalise whitespace
+            raw = raw.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+
+            # getaddresses returns [(display_name, addr), ...]
+            pairs = email.utils.getaddresses([raw])
+
+            seen: set[str] = set()
+            result: list[str] = []
+
+            for _name, addr in pairs:
+                addr = (addr or "").strip().lower().strip("<>")
+
+                if not addr or "@" not in addr:
+                    continue
+
+                if addr in seen or addr in outgoing_emails:
+                    continue
+
+                seen.add(addr)
+                result.append(addr)
+
+            return result
+
+        # def _clean_addr_list(raw: str | list | None) -> list[str]:
+        #     """Parse, normalise, deduplicate and remove outgoing addresses.
+
+        #     Handles any of these formats safely:
+        #       bare@email.com
+        #       <bare@email.com>
+        #       "Display Name" <email@domain.com>
+        #       'Name'\r\n\t<email@domain.com>
+        #     Uses email.utils.getaddresses which correctly handles commas
+        #     inside quoted display names.
+        #     """
+        #     if not raw:
+        #         return []
+        #     if isinstance(raw, list):
+        #         raw = ",".join(raw)
+        #     # getaddresses returns [(display_name, addr), ...]
+        #     pairs = email.utils.getaddresses([raw])
+        #     seen: set[str] = set()
+        #     result: list[str] = []
+        #     for _name, addr in pairs:
+        #         addr = addr.strip().lower()
+        #         if not addr or "@" not in addr:
+        #             continue
+        #         if addr in seen or addr in outgoing_emails:
+        #             continue
+        #         seen.add(addr)
+        #         result.append(addr)
+        #     return result
+
+        # Deduplicate and filter TO, CC, BCC
+        to_list = _clean_addr_list(recipients)
+        to_set = {a.lower() for a in to_list}
+
+        # CC must also not overlap with TO
+        cc_list = [a for a in _clean_addr_list(cc) if a.lower() not in to_set]
+        cc_set = to_set | {a.lower() for a in cc_list}
+
+        # BCC must not overlap with TO or CC
+        bcc_list = [a for a in _clean_addr_list(bcc) if a.lower() not in cc_set]
+
+        if not to_list:
+            # All recipients were filtered out (e.g. raised_by is the helpdesk
+            # inbox itself). Sending would create an email loop — abort silently.
+            frappe.msgprint(
+                _("Reply not sent: the recipient address belongs to a helpdesk email account."),
+                alert=True,
+                indicator="orange",
+            )
+            return
+
+        recipients = ",".join(to_list)
+        cc = ",".join(cc_list) if cc_list else None
+        bcc = ",".join(bcc_list) if bcc_list else None
+
+        # Generate a message_id now so we can store it on Communication AND pass
+        # it to frappe.sendmail. This ensures the outgoing email's Message-Id
+        # header matches what is stored in Communication.message_id, which is
+        # exactly what Frappe's inbound email handler uses to match a reply back
+        # to the same ticket (instead of opening a new one).
+        outgoing_message_id = email.utils.make_msgid(domain=frappe.local.site)
+        # Strip angle brackets — Communication stores without them
+        outgoing_message_id_bare = outgoing_message_id.strip("<>")
+
+        # Find the last *received* communication to reply to (the customer's
+        # email). Prefer received over sent so In-Reply-To points at the
+        # customer's original message, which is what Gmail/Outlook expect.
+        last_received = frappe.get_all(
+            "Communication",
+            filters={
+                "reference_doctype": "HD Ticket",
+                "reference_name": self.name,
+                "sent_or_received": "Received",
+                "message_id": ["is", "set"],
+            },
+            fields=["name", "message_id"],
+            order_by="creation desc",
+            limit=1,
+             
+        )
+        last_communication = self.get_last_communication()
+        in_reply_to_message_id = None
+        in_reply_to_comm_name = None
+        logger.info(f"Last received communication: {last_received}")
+        logger.info(f"Last communication: {last_communication.name if last_communication else None}")   
+        if last_received:
+            #in_reply_to_message_id = last_received[0]["message_id"]
+            in_reply_to_comm_name = last_received[0]["name"]
+        elif last_communication:
+            #in_reply_to_message_id = last_communication["message_id"]
+            in_reply_to_comm_name = last_communication["name"]
+        # in_reply_to_comm = (
+        #     last_received_comms[0]
+        #     if last_received_comms
+        #     else (last_communication.name if last_communication else None)
+        # )
+        
         communication = frappe.get_doc(
             {
                 "bcc": bcc,
@@ -592,6 +773,8 @@ class HDTicket(Document):
                 "doctype": "Communication",
                 "email_account": sender_email.name if sender_email else None,
                 "email_status": "Open",
+                "in_reply_to": in_reply_to_comm_name,
+                "message_id": outgoing_message_id_bare,
                 "recipients": recipients,
                 "reference_doctype": "HD Ticket",
                 "reference_name": self.name,
@@ -601,14 +784,10 @@ class HDTicket(Document):
                 "subject": subject,
             }
         )
-
-        last_communication = self.get_last_communication()
-        if last_communication and last_communication.message_id:
-            communication.in_reply_to = last_communication.name
-
+        logger.info(f"Creating Communication with data: {communication.as_dict()}")
         communication.insert(ignore_permissions=True)
         capture_event("agent_replied")
-
+        logger.info(f"Created Communication {communication.name} for reply via agent")
         _attachments = []
 
         for attachment in attachments:
@@ -673,9 +852,10 @@ class HDTicket(Document):
                 sender=reply_to_email,
                 subject=subject,
                 with_container=False,
-                in_reply_to=(
-                    last_communication.name if last_communication.name else None
-                ),
+                # Pass the bare message_id so frappe sets the same Message-Id
+                # header on the outgoing email as what we stored on Communication.
+                message_id=outgoing_message_id_bare,
+                in_reply_to=in_reply_to_comm_name, 
             )
         except Exception as e:
             frappe.throw(_(e))

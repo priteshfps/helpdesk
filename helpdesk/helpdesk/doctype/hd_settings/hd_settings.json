@@ -407,6 +407,18 @@
    "label": "Email Content"
   },
   {
+   "fieldname": "assignment_email_section",
+   "fieldtype": "Section Break",
+   "label": "Assignment Email"
+  },
+  {
+   "default": "0",
+   "description": "If enabled, no email will be sent to agents when a ticket is assigned to them",
+   "fieldname": "disable_assignment_email",
+   "fieldtype": "Check",
+   "label": "Disable Assignment Email"
+  },
+  {
    "fieldname": "reply_from_contact_section",
    "fieldtype": "Section Break",
    "label": "Reply From Contact"

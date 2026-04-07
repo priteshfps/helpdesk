@@ -739,3 +739,38 @@ export function parseApiOptions(
       }) || []
   );
 }
+
+/**
+ * Extract a bare, lowercase email address from any format:
+ *   "Name <email>", <email>, email, "'Name'\r\n\t<email>" → email
+ */
+export function extractBareEmail(raw: string): string {
+  if (!raw || typeof raw !== "string") return "";
+  const cleaned = raw.replace(/[\r\n\t]/g, " ").trim();
+  const angle = cleaned.match(/<([^>]+)>/);
+  if (angle) return angle[1].trim().toLowerCase();
+  const bare = cleaned.match(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/);
+  return bare ? bare[1].trim().toLowerCase() : "";
+}
+
+/**
+ * Split a comma-separated string or array into unique, bare email addresses.
+ * Normalises formats like <email>, "Name <email>", whitespace variants.
+ */
+export function normalizeEmailList(
+  input: string | string[] | null | undefined
+): string[] {
+  if (!input) return [];
+  const items = Array.isArray(input) ? input : input.split(",");
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of items) {
+    const email = extractBareEmail(item);
+    if (email && !seen.has(email)) {
+      seen.add(email);
+      result.push(email);
+    }
+  }
+  return result;
+}
+
