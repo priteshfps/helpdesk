@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col">
+  <div id="hd-dashboard" class="flex flex-col">
     <LayoutHeader>
       <template #left-header>
         <div class="text-lg font-medium text-gray-900">

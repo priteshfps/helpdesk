@@ -40,6 +40,39 @@
       </div>
     </div>
 
+    <!-- Billing & Time Fields -->
+    <div class="hd-billing-section mt-1 mx-0 px-5 py-3 border-t">
+      <div class="hd-billing-label text-xs font-semibold uppercase tracking-wider mb-2">Billing & Time</div>
+      <div class="flex flex-col gap-2">
+        <!-- Time Spent -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-600 w-28 shrink-0">Time Spent</span>
+          <input
+            type="text"
+            class="flex-1 h-7 rounded border border-outline-gray-2 bg-white px-2 text-sm text-ink-gray-8 placeholder-ink-gray-4 focus:ring-0 focus:outline-none transition-colors hd-input-focus"
+            placeholder="hh:mm:ss"
+            :value="formatDuration(ticket?.doc?.time_duration)"
+            @change="(e) => handleDurationInput(e.target.value)"
+          />
+        </div>
+        <!-- Billable -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-600 w-28 shrink-0">Billable</span>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              class="hd-checkbox h-4 w-4 rounded border-gray-300 cursor-pointer"
+              :checked="!!ticket?.doc?.is_billable"
+              @change="(e) => handleFieldUpdate('is_billable', e.target.checked ? 1 : 0)"
+            />
+            <span class="text-sm" :class="ticket?.doc?.is_billable ? 'hd-text-primary font-medium' : 'text-gray-400'">
+              {{ ticket?.doc?.is_billable ? 'Yes' : 'No' }}
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <!-- Additional Fields -->
     <div class="border-t flex flex-col flex-1 h-full pb-3 overflow-y-hidden">
       <!-- TODO: Hack of 80 % for now, will refactor -->
@@ -195,6 +228,29 @@ const setFieldRef = (fieldname: string, el: any) => {
     fieldRefs.value[fieldname] = el;
   }
 };
+
+// Duration helpers for time_duration field (stored as seconds in DB)
+function formatDuration(seconds: number | null | undefined): string {
+  if (!seconds) return "";
+  const s = Math.round(Number(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return [h, m, sec].map((v) => String(v).padStart(2, "0")).join(":");
+}
+
+function handleDurationInput(raw: string) {
+  const parts = raw.trim().split(":").map(Number);
+  let seconds = 0;
+  if (parts.length === 3) {
+    seconds = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+  } else if (parts.length === 2) {
+    seconds = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60;
+  } else if (parts.length === 1 && !isNaN(parts[0])) {
+    seconds = parts[0] * 60;
+  }
+  handleFieldUpdate("time_duration", seconds);
+}
 
 useShortcut("t", () => {
   fieldRefs.value?.ticket_type?.$el?.querySelector("button")?.click();

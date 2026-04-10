@@ -97,6 +97,18 @@ class HDTicket(Document):
 
     def validate(self):
         self.validate_feedback()
+        self.validate_time_duration_on_close()
+
+    def validate_time_duration_on_close(self):
+        if (
+            self.has_value_changed("status")
+            and self.status == "Closed"
+            and not self.time_duration
+        ):
+            frappe.throw(
+                frappe._("Please enter the <b>Time Spent</b> before closing the ticket."),
+                title=frappe._("Time Spent Required"),
+            )
 
     def before_save(self):
         self.apply_sla()

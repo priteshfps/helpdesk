@@ -69,6 +69,9 @@ doc_events = {
     "Email Queue": {
         "before_insert": "helpdesk.overrides.communication_threading.add_threading_headers"
     },
+    "Communication": {
+        "after_insert": "helpdesk.overrides.communication.after_communication_insert",
+    },
 #     "Notification Log": {
 #         "after_insert": "helpdesk.overrides.notification.after_notification_log_insert"
 #     },
@@ -89,6 +92,7 @@ permission_query_conditions = {
 # Override standard doctype classes
 override_doctype_class = {
     "Email Account": "helpdesk.overrides.email_account.CustomEmailAccount",
+    "Notification Log": "helpdesk.overrides.notification.CustomNotificationLog",
 }
 
 ignore_links_on_delete = [

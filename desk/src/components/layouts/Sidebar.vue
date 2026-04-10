@@ -1,5 +1,6 @@
 <template>
   <div
+    id="hd-sidebar"
     class="flex select-none flex-col border-r border-gray-200 bg-gray-50 p-2 text-base duration-300 ease-in-out"
     :style="{
       'min-width': width,

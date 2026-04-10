@@ -145,6 +145,10 @@ const statusDropdown = computed(() => {
     onClick: () => {
       notifyTicketUpdate("Status", o.label_agent);
       if (ticket.value.doc.status === o.label_agent) return;
+      if (o.label_agent === "Closed" && !ticket.value.doc.time_duration) {
+        toast.error(__("Please enter Time Spent before closing the ticket."));
+        return;
+      }
       ticket.value.setValue.submit(
         { status: o.label_agent },
         {

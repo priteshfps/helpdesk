@@ -63,6 +63,9 @@
   "is_merged",
   "merged_with",
   "ticket_split_from",
+  "billing_section",
+  "time_duration",
+  "is_billable",
   "feedback_tab",
   "customer_feedback_section",
   "feedback_rating",
@@ -463,13 +466,31 @@
    "label": "Ticket raised outside working hours",
    "read_only": 1,
    "set_only_once": 1
+  },
+  {
+   "fieldname": "billing_section",
+   "fieldtype": "Section Break",
+   "label": "Billing & Time"
+  },
+  {
+   "fieldname": "time_duration",
+   "fieldtype": "Duration",
+   "label": "Time Spent",
+   "description": "Total time spent to resolve this ticket (hh:mm:ss)"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_billable",
+   "fieldtype": "Check",
+   "label": "Billable",
+   "description": "Mark this ticket as billable to the customer"
   }
  ],
  "grid_page_length": 50,
  "icon": "fa fa-issue",
  "idx": 61,
  "links": [],
- "modified": "2026-02-27 16:42:43.292656",
+ "modified": "2026-04-08 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Helpdesk",
  "name": "HD Ticket",

@@ -18,6 +18,7 @@ import { createPinia } from "pinia";
 import App from "./App.vue";
 import { createDialog } from "./components/dialogs";
 import "./index.css";
+import { restoreHDTheme, setHDTheme } from "./utils/themeColor";
 import { router } from "./router";
 import { telemetryPlugin } from "frappe-ui/frappe";
 import { isCustomerPortal } from "@/utils";
@@ -36,6 +37,15 @@ const globalComponents = {
   Tooltip,
   TextInput,
 };
+
+// Single root class — all theme CSS is scoped under body.hd-app
+document.body.classList.add("hd-app");
+
+// Restore saved theme (or keep default violet from index.css)
+restoreHDTheme();
+// Expose globally so agents/admins can retheme from the browser console:
+//   window.setHDTheme('#0ea5e9')
+window.setHDTheme = setHDTheme;
 
 setConfig("resourceFetcher", frappeRequest);
 setConfig("serverMessagesHandler", (msgs) => {

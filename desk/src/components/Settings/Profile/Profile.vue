@@ -164,6 +164,61 @@
           />
         </div>
       </div>
+      <hr class="my-6" />
+      <!-- Theme Color -->
+      <div>
+        <div class="text-base font-semibold text-ink-gray-9 mb-1">
+          {{ __("Theme Color") }}
+        </div>
+        <p class="text-p-sm text-ink-gray-6 mb-4">
+          {{ __("Choose an accent color for the app. Applied only for you.") }}
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-for="swatch in themeSwatches"
+            :key="swatch.hex"
+            :title="swatch.label"
+            class="h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2"
+            :style="{
+              backgroundColor: swatch.hex,
+              borderColor: themeColor.value === swatch.hex ? swatch.hex : 'transparent',
+              boxShadow: themeColor.value === swatch.hex ? '0 0 0 2px white, 0 0 0 4px ' + swatch.hex : 'none',
+            }"
+            @click="applyTheme(swatch.hex)"
+          />
+          <!-- Custom color picker -->
+          <label
+            class="relative h-7 w-7 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 overflow-hidden"
+            title="Custom color"
+          >
+            <span class="text-gray-400 text-xs select-none">+</span>
+            <input
+              type="color"
+              class="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              :value="themeColor"
+              @input="(e) => applyTheme(e.target.value)"
+            />
+          </label>
+          <!-- Reset -->
+          <button
+            class="ml-1 text-p-sm text-ink-gray-5 hover:text-ink-gray-8 underline underline-offset-2"
+            @click="applyTheme(defaultTheme)"
+          >
+            {{ __("Reset") }}
+          </button>
+        </div>
+        <!-- Live preview pill -->
+        <div class="mt-4 flex items-center gap-3">
+          <div
+            class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-p-sm font-medium"
+            :style="{ backgroundColor: themeColor, color: themeContrast }"
+          >
+            <span>{{ __("Preview") }}</span>
+          </div>
+          <span class="text-p-xs text-ink-gray-4 font-mono">{{ themeColor }}</span>
+        </div>
+      </div>
+
     </template>
   </SettingsLayoutBase>
   <ChangePasswordModal
@@ -193,8 +248,34 @@ import { disableSettingModalOutsideClick } from "../settingsModal";
 import SettingsLayoutBase from "@/components/layouts/SettingsLayoutBase.vue";
 import Link from "@/components/frappe-ui/Link.vue";
 import { HDAgent } from "@/types/doctypes";
+import { HD_DEFAULT_THEME, setHDTheme } from "@/utils/themeColor";
 
 const auth = useAuthStore();
+
+// ── Theme color picker ──────────────────────────────────────────
+const defaultTheme = HD_DEFAULT_THEME;
+const themeSwatches = [
+  { label: "Violet (default)", hex: HD_DEFAULT_THEME },
+  { label: "Indigo",           hex: "#4f46e5" },
+  { label: "Blue",             hex: "#2563eb" },
+  { label: "Cyan",             hex: "#0891b2" },
+  { label: "Teal",             hex: "#0d9488" },
+  { label: "Green",            hex: "#16a34a" },
+  { label: "Orange",           hex: "#ea580c" },
+  { label: "Rose",             hex: "#e11d48" },
+];
+const themeColor = ref(localStorage.getItem("hd-theme-color") || defaultTheme);
+const themeContrast = ref(
+  getComputedStyle(document.documentElement).getPropertyValue("--hd-contrast").trim() || "#ffffff"
+);
+function applyTheme(hex: string) {
+  setHDTheme(hex);
+  themeColor.value = hex;
+  themeContrast.value =
+    getComputedStyle(document.documentElement).getPropertyValue("--hd-contrast").trim() || "#ffffff";
+}
+
+
 const profile = ref({
   fullName: auth.userName,
   userImage: auth.userImage,

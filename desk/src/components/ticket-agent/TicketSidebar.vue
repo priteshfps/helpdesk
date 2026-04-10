@@ -1,5 +1,5 @@
 <template>
-  <Resizer class="flex flex-col justify-between border-l" side="right">
+  <Resizer id="hd-ticket-panel" class="flex flex-col justify-between border-l" side="right">
     <TabButtons
       :buttons="tabs"
       v-model="currentTab"

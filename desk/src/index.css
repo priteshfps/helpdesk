@@ -17,3 +17,326 @@ html,
 body {
   color: var(--ink-gray-9);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   HD THEME — everything scoped under body.hd-app
+   ───────────────────────────────────────────────────────────────────
+   One body class is added in main.js: document.body.classList.add('hd-app')
+   No other Vue component needs a class change.
+   To switch color at runtime: window.setHDTheme('#hex') or
+   Settings → Profile → Theme Color
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Design tokens — change these 10 vars to retheme everything ── */
+:root {
+  --hd-50:       #f5f3ff;
+  --hd-100:      #ede9fe;
+  --hd-200:      #ddd6fe;
+  --hd-300:      #c4b5fd;
+  --hd-400:      #a78bfa;
+  --hd-500:      #8b5cf6;
+  --hd-600:      #7c3aed;
+  --hd-700:      #6d28d9;
+  --hd-800:      #5b21b6;
+  --hd-900:      #4c1d95;
+  --hd-contrast: #ffffff;
+}
+
+/* ── 2. Map to Frappe UI's internal tokens (global — affects all FUI components) ── */
+body.hd-app {
+  /* Blue palette → theme palette */
+  --blue-50:  var(--hd-50);
+  --blue-100: var(--hd-100);
+  --blue-200: var(--hd-200);
+  --blue-300: var(--hd-300);
+  --blue-400: var(--hd-400);
+  --blue-500: var(--hd-500);
+  --blue-600: var(--hd-600);
+  --blue-700: var(--hd-700);
+  --blue-800: var(--hd-800);
+  --blue-900: var(--hd-900);
+
+  /* Semantic surface / outline / ink tokens */
+  --surface-blue-1: var(--hd-50);
+  --surface-blue-2: var(--hd-100);
+  --surface-blue-3: var(--hd-700);
+  --outline-blue-1: var(--hd-300);
+  --ink-blue-1:     var(--hd-50);
+  --ink-blue-2:     var(--hd-600);
+  --ink-blue-3:     var(--hd-700);
+  --ink-blue-link:  var(--hd-600);
+
+  /* Override Frappe UI neutral surface tokens used in ListView & tabs */
+  --surface-gray-2:   var(--hd-100);  /* ListHeader bg, selected row bg    */
+  --surface-gray-3:   var(--hd-200);  /* Selected+hover row bg             */
+  --surface-menu-bar: var(--hd-50);   /* ListRow hover bg                  */
+}
+
+/* ── 3. Sidebar (#hd-sidebar) ───────────────────────────────────────── */
+
+#hd-sidebar {
+  background-color: var(--hd-50) !important;
+  border-right: 1px solid var(--hd-200) !important;
+}
+
+/* Active link — deeper tint + left accent bar */
+#hd-sidebar .bg-white {
+  background-color: var(--hd-100) !important;
+  box-shadow: inset 3px 0 0 var(--hd-500) !important;
+}
+
+/* Hover */
+#hd-sidebar [class*="hover:bg-gray"]:hover {
+  background-color: var(--hd-100) !important;
+}
+
+/* ── 3b. App header (#hd-header) ────────────────────────────────────── */
+
+/* Same light tint as sidebar — forms a consistent themed frame */
+#hd-header {
+  background-color: var(--hd-50) !important;
+  border-bottom: 2px solid var(--hd-200) !important;
+}
+
+/* ── 4. Utility helpers (used inside Vue components via plain classes) ── */
+body.hd-app .hd-text-primary { color: var(--hd-700); }
+body.hd-app .hd-bg-primary   { background-color: var(--hd-600); color: var(--hd-contrast); }
+body.hd-app .hd-input-focus:focus { border-color: var(--hd-400); }
+body.hd-app .hd-checkbox     { accent-color: var(--hd-600); }
+
+/* ── 4. List view ──────────────────────────────────────────────────── */
+
+/* Column header labels (Frappe UI ListHeaderItem inner text) */
+body.hd-app .mb-2.grid.rounded .text-ink-gray-5 {
+  color: var(--hd-800) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Column header row border */
+body.hd-app .mb-2.grid.rounded {
+  border: 1px solid var(--hd-200);
+}
+
+/* Row dividers */
+body.hd-app .h-px.border-t {
+  border-color: var(--hd-100) !important;
+}
+
+/* Inset left accent bar on hover (the router-link / div is the row element) */
+body.hd-app .flex-col.transition-all.duration-300:hover {
+  box-shadow: inset 3px 0 0 var(--hd-500);
+}
+
+/* Zebra: even rows get a faint tint via nth-child on the rows container */
+body.hd-app .h-full.overflow-y-auto > a.rounded:nth-child(even),
+body.hd-app .h-full.overflow-y-auto > div.rounded:nth-child(even) {
+  background-color: var(--hd-50);
+}
+
+/* ── 5. Quick-filter toolbar inputs ────────────────────────────────── */
+
+/* TextInput borders inside the toolbar area */
+body.hd-app .flex-1.items-center input[type="text"] {
+  border-color: var(--hd-200) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+body.hd-app .flex-1.items-center input[type="text"]:focus {
+  border-color: var(--hd-500) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hd-500) 15%, transparent) !important;
+  outline: none !important;
+}
+/* Filled filter (has a typed value) */
+body.hd-app .flex-1.items-center input[type="text"]:not([value=""]):not([value]) {
+  border-color: var(--hd-400) !important;
+  background-color: var(--hd-50) !important;
+}
+
+/* Quick-filter selects */
+body.hd-app .flex-1.items-center select {
+  border-color: var(--hd-200) !important;
+}
+body.hd-app .flex-1.items-center select:focus {
+  border-color: var(--hd-500) !important;
+  outline: none !important;
+}
+
+/* ── 6. Sidebar tab strip ──────────────────────────────────────────── */
+body.hd-app .tab-buttons button[aria-selected="true"],
+body.hd-app .tab-buttons button[data-state="active"] {
+  color: var(--hd-800) !important;
+  border-bottom-color: var(--hd-600) !important;
+}
+
+/* ── 7. Ticket detail: core field labels ───────────────────────────── */
+body.hd-app .form-control-core label,
+body.hd-app .form-control-core .label {
+  color: var(--hd-700) !important;
+  font-weight: 600 !important;
+}
+
+/* ── 8. Billing & Time section ─────────────────────────────────────── */
+body.hd-app .hd-billing-section {
+  background-color: var(--hd-50);
+  border-top-color: var(--hd-200);
+}
+body.hd-app .hd-billing-label {
+  color: var(--hd-700);
+}
+
+/* ── 9. Ticket detail view ─────────────────────────────────────────── */
+
+/* Activity / Emails / Comments tab list */
+body.hd-app [role="tablist"] {
+  border-bottom: 2px solid var(--hd-100) !important;
+  background-color: var(--hd-50) !important;
+}
+
+/* Individual tab */
+body.hd-app [role="tab"] {
+  color: var(--hd-600) !important;
+  font-weight: 500;
+}
+
+/* Active tab underline */
+body.hd-app [role="tab"][aria-selected="true"] {
+  color: var(--hd-700) !important;
+  font-weight: 700 !important;
+  border-bottom-color: var(--hd-600) !important;
+}
+
+/* Right panel (#hd-ticket-panel) */
+#hd-ticket-panel {
+  background-color: var(--hd-50) !important;
+  border-left-color: var(--hd-200) !important;
+}
+
+/* Right panel: Details / Contact tab strip */
+#hd-ticket-panel .tab-buttons {
+  background-color: var(--hd-100);
+  border-radius: 8px;
+  padding: 3px;
+  margin: 12px 16px 4px;
+}
+#hd-ticket-panel .tab-buttons button {
+  border-radius: 6px !important;
+  border: none !important;
+  color: var(--hd-700) !important;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+#hd-ticket-panel .tab-buttons button[aria-selected="true"],
+#hd-ticket-panel .tab-buttons button[data-state="active"] {
+  background-color: #ffffff !important;
+  color: var(--hd-700) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--hd-700) 20%, transparent) !important;
+  border-bottom-color: transparent !important;
+}
+
+/* Right panel: section headings */
+#hd-ticket-panel .text-xs.font-semibold.uppercase,
+#hd-ticket-panel .text-xs.font-medium.uppercase {
+  color: var(--hd-600) !important;
+  letter-spacing: 0.06em;
+}
+
+/* Right panel: form control borders */
+#hd-ticket-panel button[class*="border"],
+#hd-ticket-panel select,
+#hd-ticket-panel input:not([type="checkbox"]) {
+  border-color: var(--hd-200) !important;
+}
+#hd-ticket-panel button[class*="border"]:hover,
+#hd-ticket-panel select:focus,
+#hd-ticket-panel input:focus {
+  border-color: var(--hd-400) !important;
+}
+
+/* Right panel: dividers between sections */
+#hd-ticket-panel hr,
+#hd-ticket-panel .border-t {
+  border-color: var(--hd-200) !important;
+}
+
+/* SLA sub-header (inside #hd-header via teleport) */
+#hd-header .flex.items-center.mx-5 {
+  color: var(--hd-800);
+}
+
+/* Ticket # copy link */
+#hd-header .cursor-copy {
+  color: var(--hd-700);
+  font-weight: 600;
+}
+
+/* ── 10. Communication footer (Reply / Reply All / Comment bar) ─── */
+body.hd-app .comm-area > div:first-child {
+  background-color: var(--hd-50) !important;
+  border-top-color: var(--hd-200) !important;
+}
+
+/* ── 11. Dashboard ─────────────────────────────────────────────── */
+
+/* Stat cards & chart cards — themed border + faint tint */
+#hd-dashboard .border.rounded-md {
+  border-color: var(--hd-200) !important;
+  background-color: var(--hd-50) !important;
+}
+
+/* Card heading / label text inside NumberChart */
+#hd-dashboard .text-ink-gray-5,
+#hd-dashboard .text-ink-gray-6 {
+  color: var(--hd-700) !important;
+  opacity: 0.75;
+}
+
+/* Filter bar — date picker trigger (explicit classes in template) */
+#hd-dashboard .border.border-outline-gray-2 {
+  border-color: var(--hd-200) !important;
+  background-color: #ffffff;
+}
+#hd-dashboard .border.border-outline-gray-2:hover {
+  border-color: var(--hd-400) !important;
+}
+
+/* Filter bar — Team & Agent Link triggers (border applied via scoped @apply, no DOM class) */
+#hd-dashboard .form-control button {
+  border-color: var(--hd-200) !important;
+  background-color: #ffffff !important;
+}
+#hd-dashboard .form-control button:hover {
+  border-color: var(--hd-400) !important;
+}
+
+/* Page title */
+#hd-dashboard .text-gray-900 {
+  color: var(--hd-800) !important;
+}
+
+/* ── 12. Dropdown & Autocomplete popups (teleported to body) ────── */
+
+/* Frappe UI Dropdown popup (reka-ui DropdownMenuPortal) */
+body.hd-app .dropdown-content {
+  border: 1px solid var(--hd-200) !important;
+  background-color: #ffffff !important;
+}
+body.hd-app .dropdown-content [data-highlighted] {
+  background-color: var(--hd-100) !important;
+}
+
+/* Autocomplete / Link popup (FUI Popover → PopoverPortal) */
+body.hd-app .PopoverContent .rounded-lg.shadow-2xl {
+  border: 1px solid var(--hd-200) !important;
+}
+/* Active / highlighted item inside Autocomplete popup */
+body.hd-app .PopoverContent .bg-gray-100 {
+  background-color: var(--hd-100) !important;
+}
+/* Search input inside popup */
+body.hd-app .PopoverContent .form-input:focus {
+  border-color: var(--hd-400) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hd-500) 15%, transparent) !important;
+}
